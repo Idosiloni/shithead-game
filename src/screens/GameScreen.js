@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, SafeAreaView, Modal,
+  ScrollView, SafeAreaView, Modal, Animated,
 } from 'react-native';
 import { useGameStore } from '../store/gameStore';
 import { socket } from '../socket';
@@ -23,12 +23,44 @@ export default function GameScreen() {
     message, jokerPending,
   } = useGameStore(s => s);
 
-  const [selected,     setSelected]     = useState([]);
-  const [showRules,    setShowRules]    = useState(false);
-  const [revealCard,   setRevealCard]   = useState(null); // face-down card briefly shown before play
-  const [handWidth,    setHandWidth]    = useState(320);  // measured container width for fan layout
+  const [selected,   setSelected]   = useState([]);
+  const [showRules,  setShowRules]  = useState(false);
+  const [revealCard, setRevealCard] = useState(null);
+  const [handWidth,  setHandWidth]  = useState(320);
 
   const isMyTurn = currentPlayerId === myId;
+
+  // ── Animation values ───────────────────────────────────────────────────────
+  const burnFlash  = useRef(new Animated.Value(0)).current;
+  const turnBounce = useRef(new Animated.Value(1)).current;
+  const playFly    = useRef(new Animated.Value(1)).current;
+
+  const prevPileLen = useRef(0);
+  const prevMyTurn  = useRef(false);
+
+  // Flash orange when the pile burns (empties)
+  useEffect(() => {
+    if (prevPileLen.current > 0 && pile.length === 0) {
+      burnFlash.setValue(1);
+      Animated.timing(burnFlash, { toValue: 0, duration: 650, useNativeDriver: false }).start();
+    }
+    prevPileLen.current = pile.length;
+  }, [pile.length]);
+
+  // Pop the YOUR TURN badge when the turn arrives
+  useEffect(() => {
+    if (isMyTurn && !prevMyTurn.current) {
+      turnBounce.setValue(0.6);
+      Animated.sequence([
+        Animated.timing(turnBounce, { toValue: 1.2,  duration: 120, useNativeDriver: false }),
+        Animated.spring(turnBounce,  { toValue: 1.0, friction: 3, tension: 180, useNativeDriver: false }),
+      ]).start();
+    }
+    prevMyTurn.current = isMyTurn;
+  }, [isMyTurn]);
+
+  // Interpolate fly-up for played cards
+  const playTranslateY = playFly.interpolate({ inputRange: [0, 1], outputRange: [-90, 0] });
 
   // Which pile of MY cards am I playing from right now?
   let source, activeCards;
@@ -90,8 +122,13 @@ export default function GameScreen() {
 
   const handlePlay = () => {
     if (selected.length === 0 || !isMyTurn) return;
-    socket.emit('play_cards', { cardIds: selected });
-    setSelected([]);
+    const toPlay = [...selected];
+    playFly.setValue(1);
+    Animated.timing(playFly, { toValue: 0, duration: 260, useNativeDriver: false }).start(() => {
+      socket.emit('play_cards', { cardIds: toPlay });
+      setSelected([]);
+      playFly.setValue(1);
+    });
   };
 
   const handlePickUp = () => {
@@ -179,6 +216,11 @@ export default function GameScreen() {
                 ))}
               </View>
             )}
+            {/* Burn flash — orange overlay that fades out when pile empties */}
+            <Animated.View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFillObject, styles.burnOverlay, { opacity: burnFlash }]}
+            />
           </View>
 
           {/* Status badges */}
@@ -203,9 +245,9 @@ export default function GameScreen() {
               </Text>
             </View>
             {isMyTurn ? (
-              <View style={styles.yourTurnBadge}>
+              <Animated.View style={[styles.yourTurnBadge, { transform: [{ scale: turnBounce }] }]}>
                 <Text style={styles.yourTurnText}>YOUR TURN</Text>
-              </View>
+              </Animated.View>
             ) : (
               <View style={styles.notYourTurnBadge}>
                 <Text style={styles.notYourTurnText}>WAIT</Text>
@@ -233,18 +275,24 @@ export default function GameScreen() {
                     <Card faceDown onPress={isMyTurn ? () => handleFaceDownTap(c) : undefined} />
                   </View>
                 ))
-              : sortedActive.map((c, i) => (
-                  <View
-                    key={c.id}
-                    style={{ marginLeft: i === 0 ? 0 : fanMargin, zIndex: selected.includes(c.id) ? 50 : i }}
-                  >
-                    <Card
-                      card={c}
-                      selected={selected.includes(c.id)}
-                      onPress={() => toggleSelect(c)}
-                    />
-                  </View>
-                ))
+              : sortedActive.map((c, i) => {
+                  const isSel = selected.includes(c.id);
+                  return (
+                    <Animated.View
+                      key={c.id}
+                      style={[
+                        { marginLeft: i === 0 ? 0 : fanMargin, zIndex: isSel ? 50 : i },
+                        isSel && { transform: [{ translateY: playTranslateY }], opacity: playFly },
+                      ]}
+                    >
+                      <Card
+                        card={c}
+                        selected={isSel}
+                        onPress={() => toggleSelect(c)}
+                      />
+                    </Animated.View>
+                  );
+                })
             }
           </View>
 
@@ -435,6 +483,7 @@ const styles = StyleSheet.create({
   pileStack: { width: 90, height: 120, position: 'relative' },
   pileCard:  { position: 'absolute' },
   emptyPile: { color: 'rgba(255,255,255,0.25)', fontSize: 13 },
+  burnOverlay: { backgroundColor: '#ff6a00', borderRadius: 10 },
 
   badges: { flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' },
   badge: {
