@@ -6,6 +6,8 @@ import {
 import { useGameStore } from '../store/gameStore';
 import { socket, setupSocket } from '../socket';
 
+const VERSION = 'v1.4';
+
 // The entry screen. Players enter their name and either create a new room
 // or join an existing one by typing a 4-character room code.
 export default function LobbyScreen() {
@@ -158,6 +160,8 @@ export default function LobbyScreen() {
             </Text>
           </View>
 
+          <Text style={styles.version}>{VERSION}</Text>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -247,5 +251,9 @@ const styles = StyleSheet.create({
   ruleNote: {
     color: 'rgba(255,255,255,0.35)', fontSize: 11,
     textAlign: 'center', marginTop: 10, lineHeight: 17,
+  },
+  version: {
+    color: 'rgba(255,255,255,0.2)', fontSize: 11,
+    marginTop: 20, textAlign: 'center', letterSpacing: 1,
   },
 });
