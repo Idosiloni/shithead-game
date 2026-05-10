@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   selected: {
     borderColor: '#f4c430',
     borderWidth: 2.5,
-    marginBottom: -16,
+    transform: [{ translateY: -14 }],
     shadowColor: '#f4c430',
     shadowOpacity: 0.9,
     shadowRadius: 12,

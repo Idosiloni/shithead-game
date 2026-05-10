@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { useGameStore } from './src/store/gameStore';
 
@@ -14,6 +15,14 @@ import GameOverScreen    from './src/screens/GameOverScreen';
 //   lobby → waiting_room → selecting → playing → game_over → lobby
 export default function App() {
   const phase = useGameStore(s => s.phase);
+
+  // Prevent mobile browser overscroll (the white flash when swiping past the edge)
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.body.style.overscrollBehavior = 'none';
+      document.documentElement.style.overscrollBehavior = 'none';
+    }
+  }, []);
 
   return (
     <>

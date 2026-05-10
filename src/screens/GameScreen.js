@@ -534,9 +534,9 @@ const styles = StyleSheet.create({
   handFan: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    minHeight: 116,
+    minHeight: 130,   // extra 14px headroom for selected-card lift
     marginBottom: 10,
-    position: 'relative',
+    overflow: 'hidden',
   },
 
   // Face-down reveal overlay
